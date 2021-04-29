@@ -1,7 +1,7 @@
 package tree
 
 import (
-	"errors"
+	"fmt"
 	"sort"
 )
 
@@ -19,56 +19,19 @@ type Node struct {
 
 // Build is a function for building a tree layout
 func Build(records []Record) (*Node, error) {
-
-	root := make(map[int]*Node)
-	processed := make(map[int]Record)
-
-	if len(records) <= 0 {
-		return nil, nil
-	}
-
+	node := make(map[int]*Node)
 	sort.Slice(records, func(i, j int) bool {
 		return records[i].ID < records[j].ID
 	})
-
-	for _, record := range records {
-		if len(processed) > 0 {
-			if _, ok := processed[record.ID-1]; !ok {
-				return nil, errors.New("non-continuous")
-			}
+	for i, r := range records {
+		if r.ID != i || r.Parent > r.ID || r.ID > 0 && r.Parent == r.ID || r.ID <= 0 && r.Parent > 0 {
+			return nil, fmt.Errorf("not in sequence or has bad parent: %v", r)
 		}
-		if record.ID < record.Parent {
-			return nil, errors.New("higher id parent of lower id")
+		node[r.ID] = &Node{ID: r.ID}
+		if i > 0 {
+			parent := node[r.Parent]
+			parent.Children = append(parent.Children, node[r.ID])
 		}
-		if record.ID > 0 && record.Parent >= 0 {
-			if record.ID == record.Parent {
-				return nil, errors.New("cycle directly")
-			}
-			if _, ok := processed[record.ID]; ok {
-				return nil, errors.New("duplicate node")
-			}
-			if parent, ok := root[record.Parent]; ok {
-				if len(parent.Children) <= 0 {
-					parent.Children = make([]*Node, 0)
-				}
-				child := &Node{ID: record.ID}
-				root[child.ID] = child
-				parent.Children = append(parent.Children, child)
-			}
-		} else {
-			if record.Parent > 0 {
-				return nil, errors.New("Root node has parent")
-			}
-			if _, ok := root[0]; ok {
-				return nil, errors.New("duplicate root")
-			} else {
-				root[0] = &Node{ID: 0}
-			}
-		}
-		processed[record.ID] = record
 	}
-	if node, ok := root[0]; !ok || node.ID != 0 {
-		return nil, errors.New("no root node")
-	}
-	return root[0], nil
+	return node[0], nil
 }
